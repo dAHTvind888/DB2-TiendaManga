@@ -2,7 +2,7 @@ import pyodbc
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-def conectar(usuario, password, main_window):
+def conectar(usuario, password):
     conn = get_connection(usuario, password)
     if conn:
         # Determinamos el rol del usuario
@@ -11,14 +11,31 @@ def conectar(usuario, password, main_window):
             opcionesVentanaVendedor()
         elif usuario == "GerenteLogin":
             # Si es Gerente, abrimos ventana de opciones de gerente
-            placeholder = 0
+            opcionesVentanaGerente()
             #abrir_ventana_gerente()
         elif usuario == "DBALogin":
-            placeholder = 0
+            opcionesVentanaDBA()
         else:
             messagebox.showerror("Acceso Denegado", "El usuario no tiene acceso permitido.")
-            conn.close()  # Cerramos conexión si es exitosa
+            conn.close()  # Cerramos conexion si es exitosa
             #main_window.quit()  # Cerrar ventana de login al conectarse
+
+def opcionesVentanaDBA():
+    ventanaDBA = tk.Tk()
+    ventanaDBA.geometry("400x300")
+
+    add_button = tk.Button(ventanaDBA, text="Add Data", command=add_select_table)
+    add_button.pack(pady=10)
+
+    visualize_button = tk.Button(ventanaDBA, text="Visualize Data", command=visualize_select_table)
+    visualize_button.pack(pady=10)
+
+    delete_button = tk.Button(ventanaDBA, text="Delete Data", command=delete_select_table)
+    delete_button.pack(pady=10)
+
+    modify_button = tk.Button(ventanaDBA, text="Modify Data", command=modify_select_table)
+    modify_button.pack(pady=10)
+
 
 def get_connection(usuario, password):
     try:
@@ -30,11 +47,116 @@ def get_connection(usuario, password):
                             )
         return conn
     except pyodbc.Error as e:
-        #  Capturamos error de autenticación
+        #  Capturamos error de autenticacion
         if "Login failed" in str(e):  
-            messagebox.showerror("Error de autenticación", "Usuario o contraseña incorrectos")
+           messagebox.showerror("Error de autenticacion", "Usuario o contrasena incorrectos")
         else:
-            messagebox.showerror("Error de conexión", f"Ocurrió un error: {str(e)}")
+            messagebox.showerror("Error de conexion", f"Ocurrio un error: {str(e)}")
+
+def opcionesVentanaGerente():
+    ventaGerente = tk.Tk()
+    ventaGerente.geometry("400x300")
+    ventaGerente.title("Acciones Gerente")
+    
+    botonReporte1 = tk.Button(ventaGerente, text="Ganancia por Dia", command=ventasPorManga)
+    botonReporte1.pack(pady=5)
+
+    botonReporte2 = tk.Button(ventaGerente, text="Top Mangas", command=topMangasVendidos)
+    botonReporte2.pack(pady=5)
+
+def ventasPorManga():
+    ventanaVentasPorManga = tk.Tk()
+    ventanaVentasPorManga.geometry("400x300")
+    
+    labelDate = tk.Label(ventanaVentasPorManga, text="Fecha(YYYY-MM-DD): ")
+    labelDate.pack(pady=5)
+    entryDate = tk.Entry(ventanaVentasPorManga)
+    entryDate.pack(pady=5)
+
+    # Crear un Treeview para mostrar los resultados
+    textResultados = ttk.Treeview(ventanaVentasPorManga, show="headings")
+    textResultados.pack(pady=10, fill=tk.BOTH, expand=True)
+
+    def reporte1():
+        date = entryDate.get()  # Obtener la fecha introducida por el usuario
+        if not date:
+            messagebox.showwarning("Advertencia", "Por favor, ingrese una fecha.")
+            return
+
+        query = f"SELECT * FROM VentasPorManga WHERE Sales_date = '{date}'"
+        
+        try:
+            conn = get_connection("GerenteLogin", "1234")
+            cursor = conn.cursor()
+            cursor.execute(query)
+            results = cursor.fetchall()  # Obtienes los resultados
+
+            # Limpiar el Treeview antes de insertar los nuevos datos
+            textResultados.delete(*textResultados.get_children())
+
+            # Asumiendo que ya tienes una lista de columnas, las obtienes de la tabla
+            columns = [description[0] for description in cursor.description]
+            textResultados["columns"] = columns
+            
+            # Establecer encabezados de las columnas
+            for col in columns:
+                textResultados.heading(col, text=col)
+                textResultados.column(col, width=100)
+
+            # Limpiar y agregar filas de datos
+            for row in results:
+                # Limpiar cada valor de la fila solo si es una cadena
+                clean_row = tuple(value.strip().replace("  ", " ") if isinstance(value, str) else value for value in row)
+                
+                # Insertar la fila limpiada en el Treeview
+                textResultados.insert("", tk.END, values=clean_row)
+
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+
+    # Crear un botón para confirmar la fecha y ejecutar la consulta
+    botonConfirmar = tk.Button(ventanaVentasPorManga, text="Confirmar Fecha", command=reporte1)
+    botonConfirmar.pack(pady=20)
+
+def topMangasVendidos():
+    ventanaTopMangasVendidos = tk.Tk()
+    ventanaTopMangasVendidos.geometry("600x400")
+    ventanaTopMangasVendidos.title("Top Mangas Vendidos")
+
+    try:
+        conn = get_connection("GerenteLogin", "1234")
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM TopMangasVendidos ORDER BY Total_Ganado DESC"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        # Obtener nombres de columnas
+        column_names = [desc[0] for desc in cursor.description]
+
+        # Crear Treeview
+        tree = ttk.Treeview(ventanaTopMangasVendidos, columns=column_names, show="headings")
+
+        for col in column_names:
+            tree.heading(col, text=col)
+            tree.column(col, anchor="center", width=150)
+
+        for row in rows:
+            # Limpia cada valor de la fila
+            clean_row = tuple(str(value).strip().replace("  ", " ") for value in row)
+            tree.insert("", tk.END, values=clean_row)
+
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Ocurrió un error: {e}")
+
 
 
 def opcionesVentanaVendedor():
@@ -46,6 +168,7 @@ def opcionesVentanaVendedor():
     botonInsertar.pack(pady=20)
 
     botonActualizar = tk.Button(ventanaVendedor, text="Actualizar", command=mostrarTablasActualizar)
+    botonActualizar.pack(pady=5)
 
 def mostrarTablasInsertar():
     ventanaInsertarTablas = tk.Tk()
@@ -110,7 +233,7 @@ def insertarManga():
 
         query = f"INSERT INTO Manga (Manga_name, Author_name, Genre, Publish_date) VALUES ('{manga_name}', '{author_name}', '{genre}', '{publish_date}')"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
@@ -165,7 +288,7 @@ def insertarVolume():
 
         query = f"INSERT INTO Volume (Volume_nro, Release_date, Price, Stock, Id_Manga) VALUES ({volume_nro}, '{release_date}', {price}, {stock}, {id_manga})"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
@@ -209,7 +332,7 @@ def insertarSales():
 
         query = f"INSERT INTO Sales (Id_Sales, Id_Volume, Quantity) VALUES ({id_sales}, {id_volume}, {quantity})"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
@@ -258,7 +381,7 @@ def insertarSalesDetails():
 
         query = f"INSERT INTO SalesDetails (Id_Customer, Id_Employee, Sales_date, Total_price) VALUES ({id_customer}, {id_employee}, '{sales_date}', {total_price})"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
@@ -319,7 +442,7 @@ def insertarCustomer():
 
         query = f"INSERT INTO Customer (Customer_name, Customer_first_surname, Customer_second_surname, NIT, Email, Customer_birthday) VALUES ('{customer_name}', '{first_surname}', '{second_surname}', '{nit}', '{email}', '{birthday}')"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
@@ -360,11 +483,12 @@ def actualizarManga():
         column = entryColumn.get()
         new_data = entryNewData.get()
 
-        query = f"UPDATE Manga SET {column} = '{new_data}' WHERE ID = {manga_id}"
+        query = f"UPDATE Manga SET {column} = ? WHERE Id_Manga = ?"
+
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
-            cursor.execute(query)
+            cursor.execute(query, (new_data, manga_id))
             conn.commit()
             messagebox.showinfo("Exito", "Manga actualizado correctamente.")
             cursor.close()
@@ -403,11 +527,11 @@ def actualizarVolume():
         column = entryColumn.get()
         new_data = entryNewData.get()
 
-        query = f"UPDATE Volume SET {column} = '{new_data}' WHERE ID = {volume_id}"
+        query = f"UPDATE Volume SET {column} = ? WHERE Id_Volume = ?"
         try:
-            conn = get_connection("Vendedor", "123")
+            conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
-            cursor.execute(query)
+            cursor.execute(query, (new_data, volume_id))
             conn.commit()
             messagebox.showinfo("Exito", "Volume actualizado correctamente.")
             cursor.close()
@@ -463,7 +587,7 @@ def add_data_to_table_SALES(table_name, select_window):
         entries[field] = entry
     
     def confirm_addition():
-        conn = get_connection()
+        conn = get_connection("DBALogin", "12345")
         cursor = conn.cursor()
 
         # Build the query dynamically
@@ -524,7 +648,7 @@ def add_data_to_table(table_name, del_window):
         
     # Confirm addition button
     def confirm_addition():
-        conn = get_connection()
+        conn = get_connection("DBALogin", "12345")
         cursor = conn.cursor()
 
         # Build the query dynamically
@@ -561,7 +685,7 @@ def add_data_to_table(table_name, del_window):
 
 # Visualize data from the table
 def visualize_table_data(table_name):
-    conn = get_connection()
+    conn = get_connection("DBALogin", "12345")
     cursor = conn.cursor()
 
     try:
@@ -625,7 +749,7 @@ def delete_data_SALES(table_name, select_window):
     id_volume_entry.pack(pady=5)
     
     def confirm_deletion():
-        conn = get_connection()
+        conn = get_connection("DBALogin", "12345")
         cursor = conn.cursor()
         #retraer la informacion usando get()
         id_sales_value = id_sales_entry.get()
@@ -661,7 +785,7 @@ def delete_data_from_table(table_name, select_window):
     id_entry.pack(pady=5)
 
     def confirm_deletion():
-        conn = get_connection()
+        conn = get_connection("DBALogin", "12345")
         cursor = conn.cursor()
         #Usamos get() para obtener el valo incresados del id por el usuario previamente
         id_value = id_entry.get()
@@ -759,7 +883,7 @@ def modify_data(table_name, select_window):
             messagebox.showerror("Error", "Must fill in all values!")
             return
         
-        conn = get_connection()
+        conn = get_connection("DBALogin", "12345")
         cursor = conn.cursor()
 
         try:
