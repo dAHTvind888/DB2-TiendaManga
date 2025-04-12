@@ -41,7 +41,7 @@ def get_connection(usuario, password):
     try:
         conn = pyodbc.connect("Driver=ODBC Driver 17 for SQL Server;"
                             "Server=LAPTOP-3PL8FJF2;"
-                            "Database=manga_store1;"
+                            "Database=Manga_Store_BD2;"
                             f"UID={usuario};"
                             f"PWD={password};"
                             )
@@ -180,14 +180,152 @@ def mostrarTablasInsertar():
     botonVolume = tk.Button(ventanaInsertarTablas, text="Volume", command=insertarVolume)
     botonVolume.pack(pady=5)
 
-    botonSales = tk.Button(ventanaInsertarTablas, text="Sales", command=insertarSales)
-    botonSales.pack(pady=5)
+    botonVender = tk.Button(ventanaInsertarTablas, text="Vender", command=venderManga)
+    botonVender.pack(pady=5)
 
-    botonSalesDetails = tk.Button(ventanaInsertarTablas, text="Sales Details", command=insertarSalesDetails)
-    botonSalesDetails.pack(pady=5)
+    #botonSales = tk.Button(ventanaInsertarTablas, text="Sales", command=insertarSales)
+    #botonSales.pack(pady=5)
+
+    #botonSalesDetails = tk.Button(ventanaInsertarTablas, text="Sales Details", command=insertarSalesDetails)
+    #botonSalesDetails.pack(pady=5)
 
     botonCustomer = tk.Button(ventanaInsertarTablas, text="Customer", command=insertarCustomer)
     botonCustomer.pack(pady=5)
+
+def venderManga():
+    ventanaVender = tk.Tk()
+    ventanaVender.geometry("400x300")
+
+    labelEmpleadoID = tk.Label(ventanaVender, text="ID del Empleado:")
+    labelEmpleadoID.pack(pady=5)
+    entryEmpleadoID = tk.Entry(ventanaVender)
+    entryEmpleadoID.pack(pady=5)
+
+    labelNIT = tk.Label(ventanaVender, text="NIT:")
+    labelNIT.pack(pady=5)
+    entryNIT = tk.Entry(ventanaVender)
+    entryNIT.pack(pady=5)
+
+    def datosManga():
+        tempNIT = entryNIT.get()
+        conn = get_connection("DBALogin", "12345")
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT NIT FROM CUSTOMER WHERE NIT = ?", (tempNIT),)
+        resultado = cursor.fetchone()
+        #if not resultado:
+         #   NIT = 'NULL'
+            #messagebox.showerror("NIT no valido")
+            #return
+        
+        ventanaDatosManga = tk.Tk()
+        ventanaDatosManga.geometry("800x800")
+
+        labelManga = tk.Label(ventanaDatosManga, text="Nombre del Manga:")
+        labelManga.pack(pady=5)
+        entryManga = tk.Entry(ventanaDatosManga)
+        entryManga.pack(pady=5)
+
+        labelVolumen = tk.Label(ventanaDatosManga, text="Volumen del Manga")
+        labelVolumen.pack(pady=5)
+        entryVolumen = tk.Entry(ventanaDatosManga)
+        entryVolumen.pack(pady=5)
+
+        labelCantidad = tk.Label(ventanaDatosManga, text="Cantidad:")
+        labelCantidad.pack(pady=5)
+        entryCantidad = tk.Entry(ventanaDatosManga)
+        entryCantidad.pack(pady=5)
+
+        def cerrar_todo():
+            ventanaDatosManga.destroy()
+            ventanaVender.destroy()
+
+        def agregarAlCarrito():
+            manga = entryManga.get()
+            volumen = entryVolumen.get()
+            cantidad = entryCantidad.get()
+            conn = get_connection("DBALogin", "12345")
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT Manga_name, V.Volume_nro 
+            FROM MANGA as M
+            INNER JOIN VOLUME as V on V.Id_Manga = M.Id_Manga
+            WHERE M.Manga_name = ? and V.Volume_nro = ?
+            """, (manga, volumen))
+
+            resultado = cursor.fetchone()
+
+            if not resultado:
+                messagebox.showerror("Error", "No existe ese manga con ese volumen.")
+                return
+            
+            try:
+                carrito.insert("", "end", values=(manga, volumen, cantidad))
+
+            except Exception as e:
+                messagebox.showerror("Error:",f" {str(e)}")
+                print(str(e))
+
+        def confirmarCompra():
+            if not carrito.get_children():
+                messagebox.showwarning("Carrito vacio")
+                return
+            
+            NIT = entryNIT.get()
+            NIT = int(NIT) if NIT else None
+            empleadoID = entryEmpleadoID.get()
+            conn = get_connection("VendedorLogin", "123")
+            cursor = conn.cursor()
+            cursor.execute("EXEC InsertarDetails ?, ?", (NIT, empleadoID))
+            conn.commit()
+
+            for item_id in carrito.get_children():
+                fila = carrito.item(item_id)['values']
+                manga = fila[0]
+                volumen = fila[1]
+                cantidad = fila[2]
+                cursor.execute("EXEC InsertarSales ?, ?, ?", (manga, volumen, cantidad))
+                conn.commit()
+                print(manga, volumen, cantidad)
+
+
+        
+        botonAgregarManga = tk.Button(ventanaDatosManga, text="Agregar", command=agregarAlCarrito)
+        botonAgregarManga.pack(pady=5)
+
+        botonConfirmarCompra = tk.Button(ventanaDatosManga, text="Confirmar Compra", command=confirmarCompra)
+        botonConfirmarCompra.pack(pady=5)
+
+        carrito = ttk.Treeview(ventanaDatosManga, columns=("Manga", "Volumen", "Cantidad"), show="headings")
+        carrito.heading("Manga", text="Manga")
+        carrito.heading("Volumen", text="Volumen")
+        carrito.heading("Cantidad", text="Cantidad")
+        carrito.pack(pady=10)
+
+        def dobleClickEliminar(event):
+            item = carrito.selection()  
+            if item:                   
+                carrito.delete(item)   
+            else:
+                messagebox.showwarning("Selecionar fila")
+
+        carrito.bind("<Double-1>", dobleClickEliminar)
+        
+        ventanaDatosManga.protocol("WM_DELETE_WINDOW", cerrar_todo)
+
+
+
+
+    botonConfirmarIdentificadores = tk.Button(ventanaVender, text="Confirmar", command=datosManga)
+    botonConfirmarIdentificadores.pack(pady=5)
+
+    
+
+    
+
+    
+
+    
+
 
 def mostrarTablasActualizar():
     ventanaActualizarTablas = tk.Tk()
@@ -231,7 +369,7 @@ def insertarManga():
         genre = entryGenre.get()
         publish_date = entryPublishDate.get()
 
-        query = f"INSERT INTO Manga (Manga_name, Author_name, Genre, Publish_date) VALUES ('{manga_name}', '{author_name}', '{genre}', '{publish_date}')"
+        query = f"INSERT INTO Manga (Manga_name, Author_name, Genre, Publish_date, Modified_date) VALUES ('{manga_name}', '{author_name}', '{genre}', '{publish_date}', GETDATE())"
         try:
             conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
@@ -240,7 +378,7 @@ def insertarManga():
             messagebox.showinfo("Exito", "Manga insertado correctamente.")
             cursor.close()
             conn.close()
-            ventanaManga.quit()  # Cerrar ventana despues de insertar
+            #ventanaManga.quit()  # Cerrar ventana despues de insertar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo insertar el manga: {str(e)}")
 
@@ -295,14 +433,14 @@ def insertarVolume():
             messagebox.showinfo("Éxito", "Volume insertado correctamente.")
             cursor.close()
             conn.close()
-            ventanaVolume.quit()  # Cerrar ventana despues de insertar
+            #ventanaVolume.quit()  # Cerrar ventana despues de insertar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo insertar el volume: {str(e)}")
 
     botonInsertar = tk.Button(ventanaVolume, text="Insertar", command=insertar)
     botonInsertar.pack(pady=20)
 
-
+'''
 def insertarSales():
     # Crear ventana para ingresar datos de la venta
     ventanaSales = tk.Tk()
@@ -339,13 +477,15 @@ def insertarSales():
             messagebox.showinfo("Exito", "Sale insertado correctamente.")
             cursor.close()
             conn.close()
-            ventanaSales.quit()  # Cerrar ventana despues de insertar
+            #ventanaSales.quit()  # Cerrar ventana despues de insertar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo insertar la venta: {str(e)}")
 
     botonInsertar = tk.Button(ventanaSales, text="Insertar", command=insertar)
     botonInsertar.pack(pady=20)
+'''
 
+'''
 def insertarSalesDetails():
     # Crear ventana para ingresar detalles de la venta
     ventanaSalesDetails = tk.Tk()
@@ -379,7 +519,7 @@ def insertarSalesDetails():
         sales_date = entrySalesDate.get()
         total_price = entryTotalPrice.get()
 
-        query = f"INSERT INTO SalesDetails (Id_Customer, Id_Employee, Sales_date, Total_price) VALUES ({id_customer}, {id_employee}, '{sales_date}', {total_price})"
+        query = f"INSERT INTO Sales_Details (Id_Customer, Id_Employee, Sales_date, Total_price) VALUES ({id_customer}, {id_employee}, '{sales_date}', {total_price})"
         try:
             conn = get_connection("VendedorLogin", "123")
             cursor = conn.cursor()
@@ -388,12 +528,13 @@ def insertarSalesDetails():
             messagebox.showinfo("Exito", "Sales Details insertado correctamente.")
             cursor.close()
             conn.close()
-            ventanaSalesDetails.quit()  # Cerrar ventana despues de insertar
+            #ventanaSalesDetails.quit()  # Cerrar ventana despues de insertar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo insertar el detalle de venta: {str(e)}")
 
     botonInsertar = tk.Button(ventanaSalesDetails, text="Insertar", command=insertar)
     botonInsertar.pack(pady=20)
+'''
 
 def insertarCustomer():
     # Crear ventana para ingresar datos del cliente
@@ -449,7 +590,7 @@ def insertarCustomer():
             messagebox.showinfo("Exito", "Cliente insertado correctamente.")
             cursor.close()
             conn.close()
-            ventanaCustomer.quit()  # Cerrar ventana despues de insertar
+            #ventanaCustomer.quit()  # Cerrar ventana despues de insertar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo insertar el cliente: {str(e)}")
 
@@ -493,7 +634,7 @@ def actualizarManga():
             messagebox.showinfo("Exito", "Manga actualizado correctamente.")
             cursor.close()
             conn.close()
-            ventanaActualizarManga.quit()  # Cerrar ventana despues de actualizar
+            #ventanaActualizarManga.quit()  # Cerrar ventana despues de actualizar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo actualizar el manga: {str(e)}")
 
@@ -536,7 +677,7 @@ def actualizarVolume():
             messagebox.showinfo("Exito", "Volume actualizado correctamente.")
             cursor.close()
             conn.close()
-            ventanaActualizarVolume.quit()  # Cerrar ventana despues de actualizar
+            #ventanaActualizarVolume.quit()  # Cerrar ventana despues de actualizar
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo actualizar el volumen: {str(e)}")
 
@@ -557,7 +698,7 @@ TABLE_COLUMNS = {
     ],
     "EMPLOYEE": [
         "Id_Employee", "Employee_name", "Employee_first_surname",
-        "Employee_second_surname", "Salary", "Hired_date",
+        "Employee_second_surname", "Wage", "Hired_date",
         "Email", "Phone_number", "Modified_date"
     ],
     "SALES_DETAILS": [

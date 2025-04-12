@@ -1,0 +1,9 @@
+CREATE TRIGGER InsertarManga
+ON MANGA
+AFTER INSERT
+AS
+BEGIN
+	UPDATE MANGA
+	SET Estado = 1
+	WHERE Id_Manga = (SELECT Id_Manga FROM inserted)
+END

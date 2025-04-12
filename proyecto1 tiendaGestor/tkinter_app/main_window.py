@@ -16,7 +16,7 @@ def start_window():
 
     labelPassword = tk.Label(main_window, text="Password: ")
     labelPassword.pack(pady=5)
-    entryPassword = tk.Entry(main_window)
+    entryPassword = tk.Entry(main_window, show="*")
     entryPassword.pack(pady=5)
 
     botonConectar = tk.Button(main_window, 

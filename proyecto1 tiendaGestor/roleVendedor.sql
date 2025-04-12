@@ -9,3 +9,5 @@ GRANT INSERT ON dbo.customer TO Vendedor;
 
 GRANT UPDATE ON dbo.manga TO Vendedor;
 GRANT UPDATE ON dbo.volume TO Vendedor;
+
+

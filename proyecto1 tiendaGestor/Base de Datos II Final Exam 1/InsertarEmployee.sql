@@ -1,0 +1,9 @@
+CREATE TRIGGER InsertarEmployee
+ON EMPLOYEE
+AFTER INSERT
+AS
+BEGIN
+	UPDATE EMPLOYEE
+	SET Estado = 1
+	WHERE Id_Employee = (SELECT Id_Employee FROM inserted)
+END
